@@ -1,5 +1,27 @@
-# Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode
-# Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode
+# Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode,python
+# Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,python
+
+### Python ###
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+*.egg-info/
+*.egg
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment variables
+.env
+.env.*
+!.env.example
 
 ### VisualStudioCode ###
 .vscode/*
