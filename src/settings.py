@@ -14,5 +14,9 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL",
-        "postgresql+asyncpg://postgres:postgres@localhost:5432/online_cinema",
+        "postgresql+asyncpg://postgres:postgres@localhost:5432/url_shortener",
     )
+
+
+def get_settings() -> Settings:
+    return Settings()
