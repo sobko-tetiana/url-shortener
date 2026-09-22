@@ -4,14 +4,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_db
 from src.codec import decode_base62, decrypt_id, encode_base62, encrypt_id
-from src.models import UrlModel, UserModel
+from src.dependencies import get_jwt_auth_manager
+from src.interfaces import JWTAuthManagerInterface
+from src.models import RefreshTokenModel, UrlModel, UserModel
 from src.schemas import (
     ShortenedUrlRequest,
     ShortenedUrlResponse,
+    UserLoginRequestSchema,
+    UserLoginResponseSchema,
     UserRegistrationRequestSchema,
     UserRegistrationResponseSchema
 )
-from src.security import hash_password
+from src.security import hash_password, verify_password
 from src.settings import Settings, get_settings
 
 
@@ -94,3 +98,50 @@ async def register_user(
         ) from e
 
     return user
+
+
+@router.post(
+    "/login",
+    response_model=UserLoginResponseSchema,
+    status_code=status.HTTP_201_CREATED,
+)
+async def login_user(
+    data: UserLoginRequestSchema,
+    db: AsyncSession = Depends(get_db),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+) -> UserLoginResponseSchema:
+    user = await db.scalar(
+        select(UserModel).where(UserModel.email == str(data.email))
+    )
+
+    if user is None or not verify_password(
+        data.password,
+        user.hashed_password,
+    ):
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "Invalid email or password.",
+        )
+
+    refresh_jwt = jwt_manager.create_refresh_token({"user_id": user.id})
+    refresh_token = RefreshTokenModel.create(
+        user_id=user.id,
+        days_valid=7,
+        token=refresh_jwt,
+    )
+    db.add(refresh_token)
+
+    try:
+        await db.commit()
+    except Exception as error:
+        await db.rollback()
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "Something went wrong. Try again later.",
+        ) from error
+
+    access_token = jwt_manager.create_access_token({"user_id": user.id})
+    return UserLoginResponseSchema(
+        access_token=access_token,
+        refresh_token=refresh_jwt,
+    )
