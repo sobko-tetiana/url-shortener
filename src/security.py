@@ -3,6 +3,14 @@ from passlib.context import CryptContext
 import secrets
 
 
+class InvalidTokenError(Exception):
+    """Raised when a JWT cannot be decoded or verified."""
+
+
+class TokenExpiredError(InvalidTokenError):
+    """Raised when a JWT has expired."""
+
+
 pwd_context = CryptContext(
     schemes=["bcrypt"],
     bcrypt__rounds=14,
