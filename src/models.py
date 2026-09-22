@@ -19,8 +19,8 @@ class UrlModel(Base):
     created_at: Mapped[str] = mapped_column(
         nullable=False, server_default=func.now()
     )
-    user_id: Mapped[int | None] = relationship(
-        "UserModel", back_populates="urls"
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
     )
     user: Mapped["UserModel | None"] = relationship(back_populates="urls")
 
@@ -39,6 +39,7 @@ class UserModel(Base):
     refresh_tokens: Mapped[list["RefreshTokenModel"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    urls: Mapped[list["UrlModel"]] = relationship(back_populates="user")
 
     def __repr__(self) -> str:
         return (
@@ -73,3 +74,16 @@ class RefreshTokenModel(TokenBaseModel):
         String(512), unique=True, nullable=False
     )
     user: Mapped["UserModel"] = relationship(back_populates="refresh_tokens")
+
+    @classmethod
+    def create(
+        cls, user_id: int | Mapped[int], days_valid: int, token: str
+    ) -> "RefreshTokenModel":
+        expires_at = datetime.now(timezone.utc) + timedelta(days=days_valid)
+        return cls(user_id=user_id, expires_at=expires_at, token=token)
+
+    def __repr__(self):
+        return (
+            f"<RefreshTokenModel(id={self.id},"
+            f"token={self.token}, expires_at={self.expires_at})>"
+        )
