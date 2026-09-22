@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_db
-from src.codec import encrypt_id
+from src.codec import encode_base62, encrypt_id
 from src.models import UrlModel
 from src.schemas import ShortenedUrlRequest, ShortenedUrlResponse
 from src.settings import Settings, get_settings
@@ -25,9 +25,10 @@ async def get_shortened_url(
         await db.rollback()
         raise e
 
-    shortened_url_code = encrypt_id(
+    obfuscated_id = encrypt_id(
         settings.ENCRYPTION_KEY, settings.ENCRYPTION_TWEAK, url.id
     )
+    shortened_url_code = encode_base62(obfuscated_id)
     shortened_url = f"{settings.APP_BASE_URL}/{shortened_url_code}"
     return ShortenedUrlResponse(
         original_url=data.original_url,
