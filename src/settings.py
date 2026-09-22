@@ -17,6 +17,16 @@ class Settings(BaseSettings):
         "postgresql+asyncpg://postgres:postgres@localhost:5432/url_shortener",
     )
 
+    ENCRYPTION_KEY: str = os.getenv(
+        "ENCRYPTION_KEY",
+        "739f4e3c9d76864c17d5d5a6cc501fa4",
+    )
+
+    ENCRYPTION_TWEAK: str = os.getenv(
+        "ENCRYPTION_TWEAK",
+        "c3ec21e55fc633",
+    )
+
 
 def get_settings() -> Settings:
     return Settings()
