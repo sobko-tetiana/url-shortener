@@ -1,5 +1,8 @@
-from sqlalchemy import func
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from datetime import datetime, timedelta, timezone
+import secrets
+
+from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
@@ -13,4 +16,60 @@ class UrlModel(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     original_url: Mapped[str] = mapped_column(nullable=False)
-    created_at: Mapped[str] = mapped_column(nullable=False, server_default=func.now())
+    created_at: Mapped[str] = mapped_column(
+        nullable=False, server_default=func.now()
+    )
+    user_id: Mapped[int | None] = relationship(
+        "UserModel", back_populates="urls"
+    )
+    user: Mapped["UserModel | None"] = relationship(back_populates="urls")
+
+
+class UserModel(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(
+        String(255), unique=True, index=True, nullable=False
+    )
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    refresh_tokens: Mapped[list["RefreshTokenModel"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<UserModel(id={self.id}, email={self.email!r}"
+        )
+
+
+class TokenBaseModel(Base):
+    __abstract__ = True
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    token: Mapped[str] = mapped_column(
+        String(64),
+        unique=True,
+        nullable=False,
+        default=lambda: secrets.token_hex(32)
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc) + timedelta(days=1),
+        nullable=False,
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+
+
+class RefreshTokenModel(TokenBaseModel):
+    __tablename__ = "refresh_tokens"
+
+    token: Mapped[str] = mapped_column(
+        String(512), unique=True, nullable=False
+    )
+    user: Mapped["UserModel"] = relationship(back_populates="refresh_tokens")
