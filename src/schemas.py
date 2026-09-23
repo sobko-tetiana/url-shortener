@@ -41,6 +41,12 @@ class MessageResponseSchema(BaseModel):
     message: str
 
 
+class UserUrlResponse(BaseModel):
+    original_url: HttpUrl
+    shortened_url: HttpUrl
+    click_count: int
+
+
 class TokenRefreshRequestSchema(BaseModel):
     refresh_token: str
 
