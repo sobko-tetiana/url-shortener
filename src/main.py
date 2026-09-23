@@ -38,11 +38,6 @@ async def urls_page():
 app.include_router(router)
 
 
-@app.get("/hello")
-def read_root():
-    return {"Hello": "World"}
-
-
 @app.exception_handler(StarletteHTTPException)
 async def not_found_page(request: Request, exc: StarletteHTTPException):
     if exc.status_code == 404 and "text/html" in request.headers.get("accept", ""):
