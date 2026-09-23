@@ -32,14 +32,113 @@ async def test_redirect_returns_404_for_unknown_code(client: AsyncClient):
     assert response.status_code == 404
 
 
-async def _register_and_login(client: AsyncClient, email: str) -> str:
+async def _login(client: AsyncClient, email: str) -> dict:
     await client.post(
         "/register", json={"email": email, "password": "password123"}
     )
     login_response = await client.post(
         "/login", json={"email": email, "password": "password123"}
     )
-    return login_response.json()["access_token"]
+    return login_response.json()
+
+
+async def _register_and_login(client: AsyncClient, email: str) -> str:
+    tokens = await _login(client, email)
+    return tokens["access_token"]
+
+
+async def test_register_rejects_duplicate_email(client: AsyncClient):
+    await client.post(
+        "/register",
+        json={"email": "dup@example.com", "password": "password123"},
+    )
+    response = await client.post(
+        "/register",
+        json={"email": "dup@example.com", "password": "password123"},
+    )
+
+    assert response.status_code == 409
+
+
+async def test_shorten_returns_existing_url_for_duplicate(
+    client: AsyncClient,
+):
+    first_response = await client.post(
+        "/shorten", json={"original_url": EXAMPLE_URL}
+    )
+    second_response = await client.post(
+        "/shorten", json={"original_url": EXAMPLE_URL}
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert (
+        first_response.json()["shortened_url"]
+        == second_response.json()["shortened_url"]
+    )
+
+
+async def test_login_rejects_wrong_password(client: AsyncClient):
+    await client.post(
+        "/register",
+        json={"email": "wrongpass@example.com", "password": "password123"},
+    )
+    response = await client.post(
+        "/login",
+        json={"email": "wrongpass@example.com", "password": "nope"},
+    )
+
+    assert response.status_code == 401
+
+
+async def test_login_rejects_unknown_email(client: AsyncClient):
+    response = await client.post(
+        "/login",
+        json={"email": "unknown@example.com", "password": "password123"},
+    )
+
+    assert response.status_code == 401
+
+
+async def test_logout_deletes_refresh_token(client: AsyncClient):
+    tokens = await _login(client, "logout@example.com")
+
+    response = await client.post(
+        "/logout", json={"refresh_token": tokens["refresh_token"]}
+    )
+    assert response.status_code == 200
+
+    refresh_response = await client.post(
+        "/refresh", json={"refresh_token": tokens["refresh_token"]}
+    )
+    assert refresh_response.status_code == 401
+
+
+async def test_logout_rejects_unknown_refresh_token(client: AsyncClient):
+    response = await client.post(
+        "/logout", json={"refresh_token": "not-a-real-token"}
+    )
+
+    assert response.status_code == 401
+
+
+async def test_refresh_returns_new_access_token(client: AsyncClient):
+    tokens = await _login(client, "refresh@example.com")
+
+    response = await client.post(
+        "/refresh", json={"refresh_token": tokens["refresh_token"]}
+    )
+
+    assert response.status_code == 200
+    assert "access_token" in response.json()
+
+
+async def test_refresh_rejects_invalid_token(client: AsyncClient):
+    response = await client.post(
+        "/refresh", json={"refresh_token": "not-a-real-token"}
+    )
+
+    assert response.status_code == 401
 
 
 async def test_list_urls_requires_authentication(client: AsyncClient):
