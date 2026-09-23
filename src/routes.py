@@ -4,7 +4,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_db
 from src.codec import decode_base62, decrypt_id, encode_base62, encrypt_id
-from src.dependencies import get_current_user_optional, get_jwt_auth_manager
+from src.dependencies import (
+    get_current_user,
+    get_current_user_optional,
+    get_jwt_auth_manager,
+)
 from src.interfaces import JWTAuthManagerInterface
 from src.models import RefreshTokenModel, UrlModel, UserModel
 from src.schemas import (
@@ -17,7 +21,8 @@ from src.schemas import (
     UserLoginResponseSchema,
     UserLogoutRequestSchema,
     UserRegistrationRequestSchema,
-    UserRegistrationResponseSchema
+    UserRegistrationResponseSchema,
+    UserUrlResponse
 )
 from src.security import InvalidTokenError, hash_password, verify_password
 from src.settings import Settings, get_settings
@@ -73,6 +78,60 @@ async def get_shortened_url(
     )
 
 
+@router.get("/urls", response_model=list[UserUrlResponse])
+async def list_user_urls(
+    user: UserModel = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings)
+) -> list[UserUrlResponse]:
+    urls = await db.scalars(
+        select(UrlModel)
+        .where(UrlModel.user_id == user.id)
+        .order_by(UrlModel.created_at.desc())
+    )
+
+    return [
+        UserUrlResponse(
+            original_url=url.original_url,
+            shortened_url=_build_shortened_url(url.id, settings),
+            click_count=url.click_count,
+        )
+        for url in urls
+    ]
+
+
+@router.delete(
+    "/urls/{shortened_url_code}",
+    response_model=MessageResponseSchema,
+    status_code=status.HTTP_200_OK,
+)
+async def delete_user_url(
+    shortened_url_code: str,
+    user: UserModel = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings)
+) -> MessageResponseSchema:
+    obfuscated_id = decode_base62(shortened_url_code)
+    original_id = decrypt_id(
+        settings.ENCRYPTION_KEY, settings.ENCRYPTION_TWEAK, obfuscated_id
+    )
+    url = await db.get(UrlModel, original_id)
+    if url is None or url.user_id != user.id:
+        raise HTTPException(status_code=404, detail="URL not found")
+
+    try:
+        await db.delete(url)
+        await db.commit()
+    except Exception as error:
+        await db.rollback()
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "Something went wrong. Try again later.",
+        ) from error
+
+    return MessageResponseSchema(message="Shortened URL deleted successfully.")
+
+
 @router.get("/{shortened_url_code}", response_model=ShortenedUrlResponse)
 async def redirect_to_original_url(
     shortened_url_code: str,
@@ -86,6 +145,13 @@ async def redirect_to_original_url(
     url = await db.get(UrlModel, original_id)
     if not url:
         raise HTTPException(status_code=404, detail="URL not found")
+
+    url.click_count += 1
+    try:
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise e
 
     return ShortenedUrlResponse(
         original_url=url.original_url,
