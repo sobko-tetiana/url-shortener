@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import secrets
 
-from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -13,6 +13,11 @@ class Base(DeclarativeBase):
 
 class UrlModel(Base):
     __tablename__ = "urls"
+    __table_args__ = (
+        UniqueConstraint(
+            "original_url", "user_id", name="uq_urls_original_url_user_id"
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     original_url: Mapped[str] = mapped_column(nullable=False)
