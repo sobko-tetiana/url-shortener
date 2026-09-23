@@ -1,0 +1,127 @@
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 120px 16px 40px;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: Canvas;
+  color: CanvasText;
+}
+header {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+header a { color: LinkText; }
+#main {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+#shorten-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  align-items: center;
+}
+#cat-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+#cat {
+  width: clamp(90px, 18vw, 220px);
+  height: clamp(90px, 18vw, 220px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(2rem, 6vw, 4rem);
+}
+#cat img { width: 100%; height: 100%; object-fit: contain; }
+#message { min-height: 1.2em; text-align: center; }
+form { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 480px; }
+form.row { flex-direction: row; }
+#result { width: 100%; max-width: 480px; }
+#result .input-with-icon { position: relative; width: 100%; }
+#result input { width: 100%; padding-right: 40px; text-overflow: ellipsis; }
+.icon-button {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 1px solid GrayText;
+  border-radius: 6px;
+  background: ButtonFace;
+  color: ButtonText;
+  padding: 6px 8px;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.icon-button:hover { opacity: 0.85; }
+.icon-button:active { transform: translateY(-50%) scale(0.95); }
+input {
+  flex: 1;
+  padding: 10px 12px;
+  font-size: 1rem;
+  border: 1px solid GrayText;
+  border-radius: 6px;
+  background: Field;
+  color: FieldText;
+}
+button, a.button {
+  padding: 10px 16px;
+  font-size: 0.95rem;
+  border: 1px solid GrayText;
+  border-radius: 6px;
+  background: ButtonFace;
+  color: ButtonText;
+  cursor: pointer;
+  text-decoration: none;
+  text-align: center;
+}
+button:hover, a.button:hover { opacity: 0.85; }
+.icon-only-button {
+  padding: 8px 10px;
+  font-size: 1.1rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.auth-switch { text-align: center; }
+.click-count {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.8em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+#urls { width: 100%; max-width: 480px; }
+#urls ul { list-style: none; padding: 0; margin: 0; }
+#urls li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid GrayText;
+}
+#urls li a { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[hidden] { display: none !important; }

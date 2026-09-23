@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,6 +38,21 @@ def _build_shortened_url(url_id: int, settings: Settings) -> str:
     )
     shortened_url_code = encode_base62(obfuscated_id)
     return f"{settings.APP_BASE_URL}/{shortened_url_code}"
+
+
+def _decode_shortened_url_code(shortened_url_code: str, settings: Settings) -> int:
+    try:
+        obfuscated_id = decode_base62(shortened_url_code)
+        original_id = decrypt_id(
+            settings.ENCRYPTION_KEY, settings.ENCRYPTION_TWEAK, obfuscated_id
+        )
+    except ValueError:
+        raise HTTPException(status_code=404, detail="URL not found")
+
+    if original_id <= 0:
+        raise HTTPException(status_code=404, detail="URL not found")
+
+    return original_id
 
 
 @router.post("/shorten", response_model=ShortenedUrlResponse)
@@ -111,10 +127,7 @@ async def delete_user_url(
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings)
 ) -> MessageResponseSchema:
-    obfuscated_id = decode_base62(shortened_url_code)
-    original_id = decrypt_id(
-        settings.ENCRYPTION_KEY, settings.ENCRYPTION_TWEAK, obfuscated_id
-    )
+    original_id = _decode_shortened_url_code(shortened_url_code, settings)
     url = await db.get(UrlModel, original_id)
     if url is None or url.user_id != user.id:
         raise HTTPException(status_code=404, detail="URL not found")
@@ -135,13 +148,11 @@ async def delete_user_url(
 @router.get("/{shortened_url_code}", response_model=ShortenedUrlResponse)
 async def redirect_to_original_url(
     shortened_url_code: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings)
-) -> ShortenedUrlResponse:
-    obfuscated_id = decode_base62(shortened_url_code)
-    original_id = decrypt_id(
-        settings.ENCRYPTION_KEY, settings.ENCRYPTION_TWEAK, obfuscated_id
-    )
+) -> ShortenedUrlResponse | RedirectResponse:
+    original_id = _decode_shortened_url_code(shortened_url_code, settings)
     url = await db.get(UrlModel, original_id)
     if not url:
         raise HTTPException(status_code=404, detail="URL not found")
@@ -152,6 +163,9 @@ async def redirect_to_original_url(
     except Exception as e:
         await db.rollback()
         raise e
+
+    if "text/html" in request.headers.get("accept", ""):
+        return RedirectResponse(url.original_url, status_code=status.HTTP_302_FOUND)
 
     return ShortenedUrlResponse(
         original_url=url.original_url,

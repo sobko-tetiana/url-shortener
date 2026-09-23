@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shortly</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header>
+  <span id="whoami" hidden></span>
+  <a id="login-link" class="button" href="/login">Log in</a>
+  <a id="signup-link" class="button" href="/register">Sign up</a>
+  <button id="logout-btn" type="button" hidden>Log out</button>
+  <a id="urls-link" class="button" href="/links" hidden>See URLs</a>
+</header>
+
+<div id="main">
+  <div id="shorten-block">
+    <form id="shorten-form" class="row">
+      <input id="original-url" type="url" placeholder="Paste a URL to shorten" required>
+      <button type="submit">Shorten</button>
+    </form>
+
+    <div id="result" hidden>
+      <div class="input-with-icon">
+        <input id="result-url" type="text" readonly>
+        <button id="copy-btn" type="button" class="icon-button" aria-label="Copy to clipboard">📋</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="cat-block">
+  <p id="message"></p>
+  <div id="cat"></div>
+</div>
+
+<script src="/static/cats.js"></script>
+<script>
+const whoami = document.getElementById("whoami");
+const loginLink = document.getElementById("login-link");
+const signupLink = document.getElementById("signup-link");
+const logoutBtn = document.getElementById("logout-btn");
+const urlsLink = document.getElementById("urls-link");
+const shortenForm = document.getElementById("shorten-form");
+const originalUrlInput = document.getElementById("original-url");
+const result = document.getElementById("result");
+
+function getAccessToken() {
+  return localStorage.getItem("access_token");
+}
+
+function clearSession() {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  localStorage.removeItem("email");
+  refreshAuthUI();
+}
+
+function refreshAuthUI() {
+  const loggedIn = Boolean(getAccessToken());
+  loginLink.hidden = loggedIn;
+  signupLink.hidden = loggedIn;
+  logoutBtn.hidden = !loggedIn;
+  urlsLink.hidden = !loggedIn;
+  whoami.hidden = !loggedIn;
+  whoami.textContent = localStorage.getItem("email") || "";
+}
+
+logoutBtn.addEventListener("click", async () => {
+  const refreshToken = localStorage.getItem("refresh_token");
+  clearSession();
+  setCat("success", "Logged out.");
+  if (refreshToken) {
+    try {
+      await fetch("/logout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+    } catch {
+      // best effort
+    }
+  }
+});
+
+shortenForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const originalUrl = originalUrlInput.value.trim();
+  result.hidden = true;
+  document.getElementById("message").textContent = "Shortening…";
+
+  const headers = { "Content-Type": "application/json" };
+  const token = getAccessToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  let res;
+  try {
+    res = await fetch("/shorten", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ original_url: originalUrl }),
+    });
+  } catch {
+    setCat("offline", "Can't reach the server. Check your connection.");
+    return;
+  }
+
+  if (!res.ok) {
+    setCat("invalid", "That doesn't look like a valid URL.");
+    return;
+  }
+
+  const data = await res.json();
+  document.getElementById("result-url").value = data.shortened_url;
+  result.hidden = false;
+  originalUrlInput.value = "";
+  setCat("success", "Shortened!");
+});
+
+document.getElementById("copy-btn").addEventListener("click", async () => {
+  const resultUrl = document.getElementById("result-url");
+  try {
+    await navigator.clipboard.writeText(resultUrl.value);
+    setCat("success", "Copied to clipboard!");
+  } catch {
+    resultUrl.select();
+    setCat("invalid", "Could not copy — try selecting and copying manually.");
+  }
+});
+
+refreshAuthUI();
+setCat("idle", "Paste a URL to shorten it.");
+</script>
+</body>
+</html>

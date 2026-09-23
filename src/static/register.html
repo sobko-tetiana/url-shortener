@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign up · Shortly</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header>
+  <a href="/">Back to Shortly</a>
+</header>
+
+<div id="main">
+  <form id="register-form">
+    <input id="email" type="email" placeholder="Email" required autofocus>
+    <input id="password" type="password" placeholder="Password" maxlength="72" required>
+    <button type="submit">Sign up</button>
+  </form>
+
+  <p class="auth-switch">Already have an account? <a href="/login">Log in</a></p>
+
+  <p id="message"></p>
+</div>
+
+<script>
+const form = document.getElementById("register-form");
+const message = document.getElementById("message");
+
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+  message.textContent = "Signing up…";
+
+  const res = await fetch("/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    message.textContent = typeof data.detail === "string" ? data.detail : "Could not sign up.";
+    return;
+  }
+
+  message.textContent = "Account created! Redirecting you to log in…";
+  setTimeout(() => {
+    window.location.href = "/login";
+  }, 1200);
+});
+</script>
+</body>
+</html>

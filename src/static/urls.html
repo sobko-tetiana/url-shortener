@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your links · Shortly</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header>
+  <a href="/">Back to Shortly</a>
+</header>
+
+<div id="main">
+  <div id="urls"></div>
+</div>
+
+<div id="cat-block">
+  <p id="message"></p>
+  <div id="cat"></div>
+</div>
+
+<script src="/static/cats.js"></script>
+<script>
+const urlsBox = document.getElementById("urls");
+
+function getAccessToken() {
+  return localStorage.getItem("access_token");
+}
+
+function clearSession() {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  localStorage.removeItem("email");
+}
+
+async function loadUrls() {
+  const token = getAccessToken();
+  if (!token) {
+    window.location.href = "/login";
+    return;
+  }
+
+  document.getElementById("message").textContent = "Loading your links…";
+  const res = await fetch("/urls", { headers: { Authorization: `Bearer ${token}` } });
+
+  if (res.status === 401 || res.status === 403) {
+    clearSession();
+    setCat("forbidden", "Your session expired. Please log in again.");
+    setTimeout(() => {
+      window.location.href = "/login";
+    }, 1500);
+    return;
+  }
+  if (!res.ok) {
+    setCat("error", "Something went wrong loading your links.");
+    return;
+  }
+
+  const urls = await res.json();
+
+  if (urls.length === 0) {
+    urlsBox.replaceChildren();
+    setCat("empty", "No shortened URLs yet.");
+    return;
+  }
+
+  const list = document.createElement("ul");
+  for (const item of urls) {
+    const li = document.createElement("li");
+
+    const link = document.createElement("a");
+    link.href = item.shortened_url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = item.shortened_url;
+
+    const clicks = document.createElement("span");
+    clicks.className = "click-count";
+    clicks.title = `${item.click_count} clicks`;
+    clicks.textContent = item.click_count;
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "icon-only-button";
+    deleteBtn.textContent = "🗑️";
+    deleteBtn.title = "Delete";
+    deleteBtn.setAttribute("aria-label", "Delete");
+    deleteBtn.addEventListener("click", () => deleteUrl(item.shortened_url));
+
+    li.append(link, clicks, deleteBtn);
+    list.append(li);
+  }
+  urlsBox.replaceChildren(list);
+  setCat("list", "Your shortened links.");
+}
+
+async function deleteUrl(shortenedUrl) {
+  const token = getAccessToken();
+  const code = shortenedUrl.split("/").pop();
+  document.getElementById("message").textContent = "Deleting…";
+
+  const res = await fetch(`/urls/${code}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    setCat("error", "Could not delete that link.");
+    return;
+  }
+  setCat("deleted", "Link deleted.");
+  await loadUrls();
+}
+
+loadUrls();
+</script>
+</body>
+</html>
