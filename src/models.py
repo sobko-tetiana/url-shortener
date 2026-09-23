@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta, timezone
 import secrets
 
-from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, func
+from sqlalchemy import (
+    DateTime, ForeignKey, Integer, String, UniqueConstraint, func
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -26,6 +28,9 @@ class UrlModel(Base):
     )
     user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id"), nullable=True
+    )
+    click_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
     )
     user: Mapped["UserModel | None"] = relationship(back_populates="urls")
 
