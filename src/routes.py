@@ -11,13 +11,15 @@ from src.schemas import (
     MessageResponseSchema,
     ShortenedUrlRequest,
     ShortenedUrlResponse,
+    TokenRefreshRequestSchema,
+    TokenRefreshResponseSchema,
     UserLoginRequestSchema,
     UserLoginResponseSchema,
     UserLogoutRequestSchema,
     UserRegistrationRequestSchema,
     UserRegistrationResponseSchema
 )
-from src.security import hash_password, verify_password
+from src.security import InvalidTokenError, hash_password, verify_password
 from src.settings import Settings, get_settings
 
 
@@ -204,4 +206,51 @@ async def logout_user(
 
     return MessageResponseSchema(
         message="Logged out successfully."
+    )
+
+
+@router.post(
+    "/refresh",
+    response_model=TokenRefreshResponseSchema,
+    status_code=status.HTTP_200_OK,
+)
+async def refresh_access_token(
+    data: TokenRefreshRequestSchema,
+    db: AsyncSession = Depends(get_db),
+    jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+) -> TokenRefreshResponseSchema:
+    try:
+        payload = jwt_manager.decode_refresh_token(data.refresh_token)
+        user_id = payload.get("user_id")
+    except InvalidTokenError as error:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "Invalid or expired refresh token.",
+        ) from error
+
+    stored_token = await db.scalar(
+        select(RefreshTokenModel).where(
+            RefreshTokenModel.token == data.refresh_token
+        )
+    )
+    if stored_token is None or stored_token.user_id != user_id:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "Refresh token not found.",
+        )
+
+    user = await db.scalar(
+        select(UserModel).where(
+            UserModel.id == user_id
+        )
+    )
+    if user is None:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "User account is unavailable.",
+        )
+
+    access_token = jwt_manager.create_access_token({"user_id": user.id})
+    return TokenRefreshResponseSchema(
+        access_token=access_token
     )
