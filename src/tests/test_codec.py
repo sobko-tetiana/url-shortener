@@ -1,14 +1,14 @@
 import pytest
 
-from src.codec import decode_base62, decrypt_id, encode_base62, encrypt_id
+from src.codec import WIDTH, decode_base62, decrypt_id, encode_base62, encrypt_id
 from src.settings import get_settings
 
 settings = get_settings()
 
 
-@pytest.mark.parametrize("value", ["0", "1", "62", "9999999999"])
+@pytest.mark.parametrize("value", ["0", "1", "62", "999999999"])
 def test_base62_roundtrip(value):
-    assert decode_base62(encode_base62(value)) == value.zfill(10)
+    assert decode_base62(encode_base62(value)) == value.zfill(WIDTH)
 
 
 @pytest.mark.parametrize("id_value", [1, 42, 123456789])
