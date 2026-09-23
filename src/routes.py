@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_db
 from src.codec import decode_base62, decrypt_id, encode_base62, encrypt_id
-from src.dependencies import get_jwt_auth_manager
+from src.dependencies import get_current_user_optional, get_jwt_auth_manager
 from src.interfaces import JWTAuthManagerInterface
 from src.models import RefreshTokenModel, UrlModel, UserModel
 from src.schemas import (
@@ -27,10 +27,14 @@ router = APIRouter()
 @router.post("/shorten", response_model=ShortenedUrlResponse)
 async def get_shortened_url(
     data: ShortenedUrlRequest,
+    user: UserModel | None = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings)
 ) -> ShortenedUrlResponse:
-    url = UrlModel(original_url=str(data.original_url))
+    url = UrlModel(
+        original_url=str(data.original_url),
+        user_id=user.id if user else None,
+    )
     db.add(url)
     try:
         await db.commit()
