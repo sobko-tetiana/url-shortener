@@ -24,6 +24,14 @@ from src.settings import Settings, get_settings
 router = APIRouter()
 
 
+def _build_shortened_url(url_id: int, settings: Settings) -> str:
+    obfuscated_id = encrypt_id(
+        settings.ENCRYPTION_KEY, settings.ENCRYPTION_TWEAK, url_id
+    )
+    shortened_url_code = encode_base62(obfuscated_id)
+    return f"{settings.APP_BASE_URL}/{shortened_url_code}"
+
+
 @router.post("/shorten", response_model=ShortenedUrlResponse)
 async def get_shortened_url(
     data: ShortenedUrlRequest,
@@ -31,10 +39,25 @@ async def get_shortened_url(
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings)
 ) -> ShortenedUrlResponse:
-    url = UrlModel(
-        original_url=str(data.original_url),
-        user_id=user.id if user else None,
+    original_url = str(data.original_url)
+    user_id = user.id if user else None
+    user_id_filter = (
+        UrlModel.user_id.is_(None) if user_id is None
+        else UrlModel.user_id == user_id
     )
+
+    existing_url = await db.scalar(
+        select(UrlModel).where(
+            UrlModel.original_url == original_url, user_id_filter
+        )
+    )
+    if existing_url is not None:
+        return ShortenedUrlResponse(
+            original_url=original_url,
+            shortened_url=_build_shortened_url(existing_url.id, settings),
+        )
+
+    url = UrlModel(original_url=original_url, user_id=user_id)
     db.add(url)
     try:
         await db.commit()
@@ -42,14 +65,9 @@ async def get_shortened_url(
         await db.rollback()
         raise e
 
-    obfuscated_id = encrypt_id(
-        settings.ENCRYPTION_KEY, settings.ENCRYPTION_TWEAK, url.id
-    )
-    shortened_url_code = encode_base62(obfuscated_id)
-    shortened_url = f"{settings.APP_BASE_URL}/{shortened_url_code}"
     return ShortenedUrlResponse(
-        original_url=data.original_url,
-        shortened_url=shortened_url
+        original_url=original_url,
+        shortened_url=_build_shortened_url(url.id, settings),
     )
 
 
