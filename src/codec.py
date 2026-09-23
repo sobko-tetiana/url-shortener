@@ -1,6 +1,6 @@
 from ff3 import FF3Cipher
 
-WIDTH = 10
+WIDTH = 9
 BASE62_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 BASE = 62
 
